@@ -1,0 +1,185 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+
+:root {
+  --bg-color: #0b0c10;
+  --text-color: #c5c6c7;
+  --accent-color: #66fcf1;
+  --panel-bg: rgba(31, 40, 51, 0.85);
+  --border-color: rgba(102, 252, 241, 0.3);
+  --tooltip-bg: rgba(11, 12, 16, 0.95);
+}
+
+body, html, #root {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  overflow: hidden;
+}
+
+.app-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.map-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+}
+
+.overlay-panel {
+  position: absolute;
+  z-index: 10;
+  background: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  color: white;
+}
+
+.timeline-container {
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.controls-header {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  align-items: center;
+}
+
+.play-button {
+  background: transparent;
+  border: 1px solid var(--accent-color);
+  color: var(--accent-color);
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.play-button:hover {
+  background: var(--accent-color);
+  color: var(--bg-color);
+  box-shadow: 0 0 10px var(--accent-color);
+}
+
+.slider-wrapper {
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.year-display {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--accent-color);
+  min-width: 70px;
+  text-shadow: 0 0 10px rgba(102, 252, 241, 0.4);
+}
+
+input[type=range] {
+  flex-grow: 1;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.15);
+  height: 6px;
+  border-radius: 3px;
+  outline: none;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  cursor: pointer;
+  box-shadow: 0 0 12px var(--accent-color);
+  transition: transform 0.1s;
+}
+
+input[type=range]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.title-panel {
+  top: 30px;
+  left: 30px;
+}
+
+h1 {
+  margin: 0 0 8px 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+p.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: #8892b0;
+  line-height: 1.4;
+}
+
+/* Tooltip */
+.tooltip {
+  position: absolute;
+  z-index: 100;
+  pointer-events: none;
+  background: var(--tooltip-bg);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-color);
+  color: #e2e8f0;
+  padding: 15px;
+  border-radius: 8px;
+  font-size: 13px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+  transform: translate(-50%, -100%);
+  margin-top: -15px;
+  width: max-content;
+  max-width: 280px;
+}
+
+.tooltip h3 {
+  margin: 0 0 8px 0;
+  color: #ff6b6b; /* Earthquakes default color */
+  font-size: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding-bottom: 5px;
+}
+
+.tooltip p {
+  margin: 4px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.tooltip strong {
+  color: var(--text-color);
+}
