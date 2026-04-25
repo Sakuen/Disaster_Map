@@ -23,17 +23,22 @@ export default function App() {
   const [currentYear, setCurrentYear] = useState(2000);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hoverInfo, setHoverInfo] = useState(null);
+  
+  const [filters, setFilters] = useState({
+    earthquake: true,
+    tsunami: true,
+    volcano: true
+  });
 
   useEffect(() => {
-    // Fetch all data upfront for smooth playback
-    fetch(`${API_URL}?start_year=${MIN_YEAR}&end_year=${MAX_YEAR}&min_mag=6.0`)
+    fetch(`${API_URL}?start_year=${MIN_YEAR}&end_year=${MAX_YEAR}&min_mag=5.0`) // Lowered min_mag to 5.0 to ensure tsunamis etc. are included
       .then(res => res.json())
       .then(d => {
         if (d.features) {
           setData(d.features);
         }
       })
-      .catch(err => console.error("Failed to fetch disaster data. Is the backend running?", err));
+      .catch(err => console.error("Failed to fetch disaster data", err));
   }, []);
 
   useEffect(() => {
@@ -41,15 +46,22 @@ export default function App() {
     if (isPlaying) {
       interval = setInterval(() => {
         setCurrentYear(y => (y >= MAX_YEAR ? MIN_YEAR : y + 1));
-      }, 300); // 300ms per year
+      }, 300);
     }
     return () => clearInterval(interval);
   }, [isPlaying]);
 
-  // Show a trailing 5 year window so dots slowly fade
   const activeData = useMemo(() => {
-    return data.filter(f => f.properties.year <= currentYear && f.properties.year >= currentYear - 5);
-  }, [data, currentYear]);
+    return data.filter(f => {
+      const type = f.properties.type;
+      if (!filters[type]) return false;
+      return f.properties.year <= currentYear && f.properties.year >= currentYear - 5;
+    });
+  }, [data, currentYear, filters]);
+
+  const toggleFilter = (type) => {
+    setFilters(prev => ({ ...prev, [type]: !prev[type] }));
+  };
 
   const layers = [
     new ScatterplotLayer({
@@ -64,27 +76,38 @@ export default function App() {
       radiusMaxPixels: 100,
       lineWidthMinPixels: 1,
       getPosition: d => d.geometry.coordinates,
-      // Color scaling depending on magnitude (Mag 6 -> Mag 9.5)
       getFillColor: d => {
+        const type = d.properties.type;
         const mag = d.properties.magnitude;
-        // Age of the event to fade opacity
         const age = currentYear - d.properties.year;
         const alpha = Math.max(0, 255 - (age * 40)); 
         
-        if (mag > 8) return [255, 50, 50, alpha];
-        if (mag > 7) return [255, 140, 0, alpha];
-        return [255, 204, 0, alpha];
+        if (type === 'tsunami') {
+          return [0, 200, 255, alpha]; // Cyan for tsunami
+        } else if (type === 'volcano') {
+          return [200, 0, 255, alpha]; // Purple for volcano
+        } else {
+          // Earthquakes
+          if (mag > 8) return [255, 50, 50, alpha];
+          if (mag > 7) return [255, 140, 0, alpha];
+          return [255, 204, 0, alpha];
+        }
       },
       getLineColor: d => {
         const age = currentYear - d.properties.year;
         const alpha = Math.max(0, 255 - (age * 40));
         return [0, 0, 0, alpha > 0 ? 150 : 0];
       },
-      getRadius: d => Math.pow((d.properties.magnitude - 5), 2) * 5000,
+      getRadius: d => {
+        const type = d.properties.type;
+        if (type === 'tsunami') return 50000;
+        return Math.pow((d.properties.magnitude - 5), 2) * 5000;
+      },
       onHover: info => setHoverInfo(info),
       updateTriggers: {
-        getFillColor: [currentYear],
-        getLineColor: [currentYear]
+        getFillColor: [currentYear, filters],
+        getLineColor: [currentYear],
+        getRadius: [filters]
       }
     })
   ];
@@ -97,11 +120,9 @@ export default function App() {
           controller={true}
           layers={layers}
           onViewStateChange={() => {
-            // Close tooltip on map interaction
             if (hoverInfo) setHoverInfo(null);
           }}
         >
-          {/* Using Carto Voyager dark basemap for high contrast free tiles */}
           <Map 
             mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
           />
@@ -110,8 +131,22 @@ export default function App() {
 
       <div className="overlay-panel title-panel">
         <h1>Global Disaster Map</h1>
-        <p className="subtitle">Visualizing Earthquakes (Mag &gt; 6.0)</p>
-        <p className="subtitle">Data from NOAA USGS Database</p>
+        <p className="subtitle">Visualizing Earth's Historical Hazards</p>
+        
+        <div className="filter-group" style={{ marginTop: '15px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '8px' }}>
+            <input type="checkbox" checked={filters.earthquake} onChange={() => toggleFilter('earthquake')} />
+            <span style={{color: '#ffcc00'}}>●</span> Earthquakes
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '8px' }}>
+            <input type="checkbox" checked={filters.tsunami} onChange={() => toggleFilter('tsunami')} />
+            <span style={{color: '#00c8ff'}}>●</span> Tsunamis
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '8px' }}>
+            <input type="checkbox" checked={filters.volcano} onChange={() => toggleFilter('volcano')} />
+            <span style={{color: '#c800ff'}}>●</span> Volcanoes
+          </label>
+        </div>
       </div>
 
       <div className="overlay-panel timeline-container">
@@ -140,10 +175,12 @@ export default function App() {
 
       {hoverInfo && hoverInfo.object && (
         <div className="tooltip" style={{ left: hoverInfo.x, top: hoverInfo.y }}>
-          <h3>{hoverInfo.object.properties.title}</h3>
+          <h3 style={{
+             color: hoverInfo.object.properties.type === 'tsunami' ? '#00c8ff' : hoverInfo.object.properties.type === 'volcano' ? '#c800ff' : '#ff6b6b'
+          }}>{hoverInfo.object.properties.title}</h3>
           <p><strong>Year:</strong> {hoverInfo.object.properties.year}</p>
+          <p><strong>Type:</strong> <span style={{textTransform: 'capitalize'}}>{hoverInfo.object.properties.type}</span></p>
           <p><strong>Magnitude:</strong> {hoverInfo.object.properties.magnitude.toFixed(1)}</p>
-          <p><strong>Depth:</strong> {hoverInfo.object.properties.depth} km</p>
           {hoverInfo.object.properties.url && (
             <p><a href={hoverInfo.object.properties.url} target="_blank" rel="noreferrer" style={{color: 'var(--accent-color)'}}>View Event Details</a></p>
           )}

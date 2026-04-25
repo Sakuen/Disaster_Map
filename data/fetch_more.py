@@ -11,18 +11,24 @@ def init_db():
 
 def fetch_tsunamis():
     print("Fetching NCEI Tsunami Data...")
-    url = "https://www.ngdc.noaa.gov/hazel/hazard-service/api/v1/tsunamis/events"
-    r = requests.get(url)
-    data = r.json()
-    items = data.get('items', [])
-    print(f"Fetched {len(items)} Tsunamis.")
-    return items
+    all_items = []
+    # NCEI API limits to 200 items, chunk by 10 years to ensure we get all records
+    for year_start in range(1900, 2030, 10):
+        url = f"https://www.ngdc.noaa.gov/hazel/hazard-service/api/v1/tsunamis/events?minYear={year_start}&maxYear={year_start+9}"
+        try:
+            r = requests.get(url)
+            items = r.json().get('items', [])
+            all_items.extend(items)
+            print(f"  {year_start}-{year_start+9}: {len(items)} Tsunamis")
+        except:
+            pass
+    print(f"Fetched {len(all_items)} Tsunamis total.")
+    return all_items
 
 def populate_tsunamis(conn, items):
     cursor = conn.cursor()
     count = 0
     for item in items:
-        # Require a valid year > 1900 and valid coordinates
         year = item.get('year')
         lat = item.get('latitude')
         lon = item.get('longitude')
@@ -32,14 +38,11 @@ def populate_tsunamis(conn, items):
             
         event_id = f"tsunami_{item.get('id')}"
         title = f"Tsunami: {item.get('locationName', 'Unknown')}, {item.get('country', '')}".strip(', ')
-        # We can use max water height or intensity as magnitude
         mag = item.get('tsIntensity', item.get('maxWaterHeight', 5.0))
-        # Ensure mag is somewhat within scale for deck.gl (5-10 range approximation)
+        if mag is None: mag = 5.0
         if mag > 10: mag = 10
-        if mag < 5: mag = 5 + (mag / 5) # normalize tiny tsunamis up to 5 so they display
+        if mag < 5: mag = 5 + (mag / 5)
             
-        # Create a basic timestamp for Jan 1 of that year to fit the timeline
-        # If month/day are provided, we can use them
         month = item.get('month', 1)
         day = item.get('day', 1)
         if month is None: month = 1
@@ -55,29 +58,64 @@ def populate_tsunamis(conn, items):
             
         try:
             cursor.execute('''
-                INSERT OR IGNORE INTO disasters 
+                INSERT OR REPLACE INTO disasters 
                 (id, type, title, magnitude, time, year, latitude, longitude, depth, url)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (event_id, 'tsunami', title, mag, time_ms, year, lat, lon, 0, url))
             count += 1
         except Exception as e:
-            print(f"Error inserting tsunami {event_id}: {e}")
+            pass
             
     conn.commit()
     print(f"Inserted {count} tsunamis into DB.")
 
 def fetch_volcanoes():
-    print("Fetching NCEI Volcano Data...")
-    url = "https://www.ngdc.noaa.gov/hazel/hazard-service/api/v1/volcanoes/locs"
-    # Actually just hit the locs and eruption endpoints
+    print("Fetching USGS Volcano Data...")
+    url = "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=1900-01-01&eventtype=volcanic%20eruption"
     r = requests.get(url)
-    if 'flashErrors' not in r.json():
-        print(f"Fetched {len(r.json().get('items', []))} Volcanoes.")
-    else:
-        print("Failed to fetch volcanoes")
+    features = r.json().get('features', [])
+    print(f"Fetched {len(features)} Volcano Eruptions.")
+    return features
+
+def populate_volcanoes(conn, features):
+    cursor = conn.cursor()
+    count = 0
+    for f in features:
+        props = f['properties']
+        geom = f['geometry']
+        
+        time_ms = props.get('time')
+        if not time_ms:
+            continue
+            
+        dt = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc) + datetime.timedelta(milliseconds=time_ms)
+        event_id = f"volcano_{f.get('id')}"
+        title = props.get('title', 'Unknown Volcanic Eruption')
+        mag = props.get('mag')
+        if mag is None or mag < 5.0: mag = 5.5 # Ensure baseline visibility
+        
+        url = props.get('url', '')
+        lon, lat, depth = geom['coordinates']
+        
+        try:
+            cursor.execute('''
+                INSERT OR REPLACE INTO disasters 
+                (id, type, title, magnitude, time, year, latitude, longitude, depth, url)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (event_id, 'volcano', title, mag, time_ms, dt.year, lat, lon, depth, url))
+            count += 1
+        except Exception as e:
+            print(f"Error inserting {event_id}: {e}")
+            
+    conn.commit()
+    print(f"Inserted {count} volcano eruptions into DB.")
 
 if __name__ == "__main__":
     conn = init_db()
     tsunamis = fetch_tsunamis()
     populate_tsunamis(conn, tsunamis)
+    
+    volcanoes = fetch_volcanoes()
+    populate_volcanoes(conn, volcanoes)
+    
     conn.close()
