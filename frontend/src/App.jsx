@@ -246,12 +246,19 @@ export default function App() {
                   <img src={detailsData.image} alt={detailsData.title} style={{width: '100%', borderRadius: '8px', marginBottom: '10px'}} />
                 )}
                 <p style={{fontSize: '14px', lineHeight: '1.5', color: '#e2e8f0'}}>{detailsData.extract}</p>
-                <a href={detailsData.url} target="_blank" rel="noreferrer" style={{color: 'var(--accent-color)', display: 'inline-block', marginTop: '10px'}}>Read Full Article on Wikipedia</a>
+                <a href={detailsData.url} target="_blank" rel="noreferrer" style={{color: 'var(--accent-color)', display: 'inline-block', marginTop: '10px', marginBottom: '10px'}}>Read Full Article on Wikipedia</a>
               </>
             ) : (
-              <p style={{color: '#8892b0'}}>No advanced Wikipedia media coverage found for this exact event. <br/><br/>
-              <a href={clickedInfo.properties.url} target="_blank" rel="noreferrer" style={{color: 'var(--accent-color)'}}>View Raw Database Event Info</a>
-              </p>
+              <p style={{color: '#8892b0', marginBottom: '10px'}}>No advanced Wikipedia media coverage found for this exact event.</p>
+            )}
+            
+            {/* Always show raw event link if available */}
+            {clickedInfo.properties.url && (
+              <div style={{marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)'}}>
+                <a href={clickedInfo.properties.url} target="_blank" rel="noreferrer" style={{color: '#8892b0', fontSize: '13px', textDecoration: 'none'}}>
+                  <span style={{textDecoration: 'underline'}}>View Raw Database Record</span> ↗
+                </a>
+              </div>
             )}
           </div>
         </div>
