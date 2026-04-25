@@ -183,3 +183,21 @@ p.subtitle {
 .tooltip strong {
   color: var(--text-color);
 }
+
+.details-panel {
+  top: 30px;
+  right: 30px;
+  width: 350px;
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.details-panel::-webkit-scrollbar {
+  width: 6px;
+}
+.details-panel::-webkit-scrollbar-thumb {
+  background: rgba(102, 252, 241, 0.3);
+  border-radius: 3px;
+}
