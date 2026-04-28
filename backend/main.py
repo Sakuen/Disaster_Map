@@ -2,6 +2,7 @@ import sqlite3
 import os
 import requests
 import time
+import datetime
 from typing import Optional
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -55,7 +56,12 @@ def get_live_events():
                 
                 # Extract time
                 from_date = props.get('fromdate', '')
-                time_ms = current_time * 1000 # fallback
+                try:
+                    # GDACS fromdate is like '2026-04-26T04:23:24'
+                    dt = datetime.datetime.fromisoformat(from_date)
+                    time_ms = int(dt.replace(tzinfo=datetime.timezone.utc).timestamp() * 1000)
+                except Exception:
+                    time_ms = int(current_time * 1000)
                 
                 events.append({
                     "id": f"gdacs_{props.get('eventid')}_{props.get('episodeid')}",
@@ -65,6 +71,7 @@ def get_live_events():
                     "magnitude": props.get('severitydata', {}).get('severity', 5.0),
                     "latitude": coords[1] if len(coords) > 1 else 0,
                     "longitude": coords[0] if len(coords) > 0 else 0,
+                    "time": time_ms,
                     "url": props.get('url', {}).get('report', ''),
                     "source": "GDACS"
                 })
@@ -90,16 +97,87 @@ def get_live_events():
                     "magnitude": props.get('mag', 5.0),
                     "latitude": coords[1] if len(coords) > 1 else 0,
                     "longitude": coords[0] if len(coords) > 0 else 0,
+                    "time": props.get('time', int(current_time * 1000)),
                     "url": props.get('url', ''),
                     "source": "USGS"
                 })
     except Exception as e:
         print(f"USGS Fetch Error: {e}")
         
+    # Sort live events by time descending (newest first)
+    events.sort(key=lambda x: x.get('time', 0), reverse=True)
+        
     LIVE_CACHE["data"] = events
     LIVE_CACHE["timestamp"] = current_time
     
     return events
+
+@app.get("/api/predict")
+def get_predictions():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Query all major earthquakes (Mag >= 6.5) with known country
+    cursor.execute('''
+        SELECT country, year, latitude, longitude
+        FROM disasters 
+        WHERE type='earthquake' AND magnitude >= 6.5 AND country IS NOT NULL AND country != 'Unknown'
+        ORDER BY country, year ASC
+    ''')
+    
+    country_data = {}
+    for row in cursor.fetchall():
+        country, year, lat, lon = row
+        if country not in country_data:
+            country_data[country] = []
+        country_data[country].append({"year": year, "lat": lat, "lon": lon})
+        
+    conn.close()
+    
+    predictions = []
+    current_year = datetime.datetime.now().year
+    
+    for country, events in country_data.items():
+        # Filter out invalid "countries" like "M 6.5 - Mid-indian Ridge"
+        if any(char.isdigit() for char in country):
+            continue
+            
+        if len(events) < 5:
+            continue # Need at least 5 major events to establish a reliable frequency
+            
+        years = sorted(list(set(e["year"] for e in events)))
+        if len(years) < 2: 
+            continue
+            
+        # Calculate Average Frequency based on the full 126 year dataset (1900 to 2026)
+        # This prevents clustered historical events from skewing the gap
+        avg_gap = 126.0 / len(events)
+        
+        last_event = max(years)
+        years_since_last = current_year - last_event
+        
+        # Calculate Seismic Gap Risk Ratio
+        risk_ratio = years_since_last / avg_gap if avg_gap > 0 else 0
+        
+        # Calculate rough centroid for map marker
+        avg_lat = sum(e["lat"] for e in events) / len(events)
+        avg_lon = sum(e["lon"] for e in events) / len(events)
+        
+        predictions.append({
+            "country": country,
+            "events_count": len(events),
+            "avg_gap_years": round(avg_gap, 1),
+            "last_event_year": last_event,
+            "years_since_last": years_since_last,
+            "risk_ratio": round(risk_ratio, 2),
+            "latitude": round(avg_lat, 2),
+            "longitude": round(avg_lon, 2)
+        })
+        
+    # Sort by risk_ratio descending
+    predictions.sort(key=lambda x: x["risk_ratio"], reverse=True)
+    
+    return predictions
 
 @app.get("/api/disasters")
 def get_disasters(

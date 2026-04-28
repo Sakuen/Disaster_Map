@@ -3,7 +3,7 @@ import DeckGL from '@deck.gl/react';
 import { ScatterplotLayer } from '@deck.gl/layers';
 import { Map } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { AlertTriangle, Activity, Bell } from 'lucide-react';
+import { AlertTriangle, Activity, Bell, Clock } from 'lucide-react';
 
 const LIVE_API_URL = 'http://127.0.0.1:8000/api/live';
 
@@ -124,6 +124,11 @@ export default function LivePage() {
                   <span style={{fontSize: '11px', color: '#8892b0'}}>{ev.source}</span>
                 </div>
                 <h4 style={{margin: '0 0 5px 0', color: '#fff', fontSize: '14px', lineHeight: '1.4'}}>{ev.title}</h4>
+                {ev.time && (
+                  <div style={{display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--accent-color)', marginBottom: '10px'}}>
+                    <Clock size={12} /> {new Date(ev.time).toLocaleString()}
+                  </div>
+                )}
                 <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#c5c6c7'}}>
                   <span style={{textTransform: 'capitalize'}}>{ev.type}</span>
                   <span>Mag: {ev.magnitude.toFixed(1)}</span>

@@ -3,6 +3,7 @@ import Navbar from './components/Navbar';
 import MapPage from './pages/MapPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import LivePage from './pages/LivePage';
+import PredictPage from './pages/PredictPage';
 import './index.css';
 
 export default function App() {
@@ -12,6 +13,7 @@ export default function App() {
       <div className="content-container">
         <Routes>
           <Route path="/" element={<LivePage />} />
+          <Route path="/predict" element={<PredictPage />} />
           <Route path="/history" element={<MapPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
         </Routes>

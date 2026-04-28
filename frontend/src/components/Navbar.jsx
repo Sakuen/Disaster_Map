@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Map, BarChart2, Activity } from 'lucide-react';
+import { Map, BarChart2, Activity, Target } from 'lucide-react';
 
 export default function Navbar() {
   return (
@@ -10,6 +10,9 @@ export default function Navbar() {
       <div className="navbar-links">
         <NavLink to="/" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'} end>
           <Activity size={18} /> Live Warnings
+        </NavLink>
+        <NavLink to="/predict" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+          <Target size={18} /> Predictions
         </NavLink>
         <NavLink to="/history" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
           <Map size={18} /> Historical Map
