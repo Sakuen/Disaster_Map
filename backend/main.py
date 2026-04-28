@@ -1,6 +1,7 @@
 import sqlite3
 import os
 import requests
+import time
 from typing import Optional
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +20,86 @@ app.add_middleware(
 @app.get("/")
 def read_root():
     return {"status": "ok", "message": "Disaster Map API is running"}
+
+# Simple in-memory cache for live data
+LIVE_CACHE = {
+    "data": None,
+    "timestamp": 0
+}
+
+@app.get("/api/live")
+def get_live_events():
+    global LIVE_CACHE
+    current_time = time.time()
+    
+    # Return cached data if less than 60 seconds old
+    if LIVE_CACHE["data"] and (current_time - LIVE_CACHE["timestamp"]) < 60:
+        return LIVE_CACHE["data"]
+        
+    events = []
+    
+    # 1. Fetch GDACS Live Events (Tsunamis, Earthquakes, Volcanoes, Floods, Tropical Cyclones)
+    try:
+        r = requests.get("https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP?eventtypes=EQ,VO,TC,FL", timeout=5)
+        if r.status_code == 200:
+            features = r.json().get('features', [])
+            for f in features:
+                props = f.get('properties', {})
+                geom = f.get('geometry', {})
+                coords = geom.get('coordinates', [0, 0])
+                
+                # Map GDACS type to our types
+                ev_type = props.get('eventtype', '')
+                type_map = {'EQ': 'earthquake', 'VO': 'volcano', 'TC': 'cyclone', 'FL': 'flood', 'TS': 'tsunami'}
+                mapped_type = type_map.get(ev_type, 'other')
+                
+                # Extract time
+                from_date = props.get('fromdate', '')
+                time_ms = current_time * 1000 # fallback
+                
+                events.append({
+                    "id": f"gdacs_{props.get('eventid')}_{props.get('episodeid')}",
+                    "title": props.get('name', props.get('description', 'Unknown Event')),
+                    "type": mapped_type,
+                    "alert_level": props.get('alertlevel', 'Green').lower(),
+                    "magnitude": props.get('severitydata', {}).get('severity', 5.0),
+                    "latitude": coords[1] if len(coords) > 1 else 0,
+                    "longitude": coords[0] if len(coords) > 0 else 0,
+                    "url": props.get('url', {}).get('report', ''),
+                    "source": "GDACS"
+                })
+    except Exception as e:
+        print(f"GDACS Fetch Error: {e}")
+
+    # 2. Fetch USGS Significant Earthquakes (Past 30 days)
+    try:
+        r = requests.get("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_month.geojson", timeout=5)
+        if r.status_code == 200:
+            features = r.json().get('features', [])
+            for f in features:
+                props = f.get('properties', {})
+                geom = f.get('geometry', {})
+                coords = geom.get('coordinates', [0, 0, 0])
+                
+                # Avoid duplicates if GDACS already has it (simple check by ID or distance could be done, but we'll just append for now)
+                events.append({
+                    "id": f"usgs_{f.get('id')}",
+                    "title": props.get('title', 'Unknown Earthquake'),
+                    "type": "earthquake",
+                    "alert_level": props.get('alert', 'green') or 'green',
+                    "magnitude": props.get('mag', 5.0),
+                    "latitude": coords[1] if len(coords) > 1 else 0,
+                    "longitude": coords[0] if len(coords) > 0 else 0,
+                    "url": props.get('url', ''),
+                    "source": "USGS"
+                })
+    except Exception as e:
+        print(f"USGS Fetch Error: {e}")
+        
+    LIVE_CACHE["data"] = events
+    LIVE_CACHE["timestamp"] = current_time
+    
+    return events
 
 @app.get("/api/disasters")
 def get_disasters(

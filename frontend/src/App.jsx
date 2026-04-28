@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import MapPage from './pages/MapPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import LivePage from './pages/LivePage';
 import './index.css';
 
 export default function App() {
@@ -10,7 +11,8 @@ export default function App() {
       <Navbar />
       <div className="content-container">
         <Routes>
-          <Route path="/" element={<MapPage />} />
+          <Route path="/" element={<LivePage />} />
+          <Route path="/history" element={<MapPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
         </Routes>
       </div>
