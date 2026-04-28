@@ -20,14 +20,23 @@ def read_root():
     return {"status": "ok", "message": "Disaster Map API is running"}
 
 @app.get("/api/disasters")
-def get_disasters(start_year: int = 1900, end_year: int = 2026, min_mag: float = 6.0):
+def get_disasters(
+    start_year: int = 1900, 
+    end_year: int = 2026, 
+    min_mag: float = 0.0,
+    max_mag: float = 10.0,
+    min_depth: float = -100.0,
+    max_depth: float = 1000.0
+):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT id, type, title, magnitude, time, year, latitude, longitude, depth, url 
+        SELECT id, type, title, magnitude, time, year, latitude, longitude, depth, url, country 
         FROM disasters 
-        WHERE year >= ? AND year <= ? AND magnitude >= ?
-    ''', (start_year, end_year, min_mag))
+        WHERE year >= ? AND year <= ? 
+          AND magnitude >= ? AND magnitude <= ?
+          AND (depth IS NULL OR (depth >= ? AND depth <= ?))
+    ''', (start_year, end_year, min_mag, max_mag, min_depth, max_depth))
     
     features = []
     for row in cursor.fetchall():
@@ -45,7 +54,8 @@ def get_disasters(start_year: int = 1900, end_year: int = 2026, min_mag: float =
                 "time": row[4],
                 "year": row[5],
                 "depth": row[8],
-                "url": row[9]
+                "url": row[9],
+                "country": row[10]
             }
         })
         
@@ -125,3 +135,52 @@ def get_event_details(year: int, title: str, type: str = 'earthquake'):
         }
         
     return {"found": False, "message": "No specific Wikipedia article found for this exact event."}
+
+@app.get("/api/analytics")
+def get_analytics():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # By Country
+    cursor.execute('''
+        SELECT country, COUNT(*) as count 
+        FROM disasters 
+        WHERE country IS NOT NULL AND country != 'Unknown'
+        GROUP BY country 
+        ORDER BY count DESC 
+        LIMIT 15
+    ''')
+    by_country = [{"country": row[0], "count": row[1]} for row in cursor.fetchall()]
+    
+    # By Year and Type
+    cursor.execute('''
+        SELECT year, type, COUNT(*) as count 
+        FROM disasters 
+        GROUP BY year, type 
+        ORDER BY year ASC
+    ''')
+    
+    year_map = {}
+    for row in cursor.fetchall():
+        y, t, c = row
+        if y not in year_map:
+            year_map[y] = {"year": y, "earthquake": 0, "tsunami": 0, "volcano": 0}
+        year_map[y][t] = c
+        
+    by_year = list(year_map.values())
+    
+    # By Type
+    cursor.execute('''
+        SELECT type, COUNT(*) as count 
+        FROM disasters 
+        GROUP BY type
+    ''')
+    by_type = [{"name": row[0], "value": row[1]} for row in cursor.fetchall()]
+    
+    conn.close()
+    
+    return {
+        "by_country": by_country,
+        "by_year": by_year,
+        "by_type": by_type
+    }
