@@ -1,7 +1,8 @@
 import sqlite3
 import os
 import requests
-from fastapi import FastAPI
+from typing import Optional
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Global Disaster Map API")
@@ -31,7 +32,7 @@ def get_disasters(
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT id, type, title, magnitude, time, year, latitude, longitude, depth, url, country 
+        SELECT id, type, title, magnitude, time, year, latitude, longitude, depth, url, country, fatalities, economic_loss 
         FROM disasters 
         WHERE year >= ? AND year <= ? 
           AND magnitude >= ? AND magnitude <= ?
@@ -55,7 +56,9 @@ def get_disasters(
                 "year": row[5],
                 "depth": row[8],
                 "url": row[9],
-                "country": row[10]
+                "country": row[10],
+                "fatalities": row[11],
+                "economic_loss": row[12]
             }
         })
         
@@ -137,28 +140,57 @@ def get_event_details(year: int, title: str, type: str = 'earthquake'):
     return {"found": False, "message": "No specific Wikipedia article found for this exact event."}
 
 @app.get("/api/analytics")
-def get_analytics():
+def get_analytics(
+    country: Optional[str] = Query(None, description="Filter by country"),
+    type: Optional[str] = Query(None, description="Filter by disaster type"),
+    year: Optional[int] = Query(None, description="Filter by year")
+):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
+    # Build dynamic WHERE clause
+    conditions = []
+    params = []
+    
+    if country:
+        conditions.append("country = ?")
+        params.append(country)
+    if type:
+        conditions.append("type = ?")
+        params.append(type)
+    if year:
+        conditions.append("year = ?")
+        params.append(year)
+        
+    where_clause = ""
+    if conditions:
+        where_clause = "WHERE " + " AND ".join(conditions)
+        
+    def build_query(base_select, base_where="", group_by="", order_by="", limit=""):
+        full_where = where_clause
+        if base_where:
+            if full_where:
+                full_where += " AND " + base_where
+            else:
+                full_where = "WHERE " + base_where
+        return f"{base_select} {full_where} {group_by} {order_by} {limit}"
+
     # By Country
-    cursor.execute('''
-        SELECT country, COUNT(*) as count 
-        FROM disasters 
-        WHERE country IS NOT NULL AND country != 'Unknown'
-        GROUP BY country 
-        ORDER BY count DESC 
-        LIMIT 15
-    ''')
+    cursor.execute(build_query(
+        base_select="SELECT country, COUNT(*) as count FROM disasters",
+        base_where="country IS NOT NULL AND country != 'Unknown'",
+        group_by="GROUP BY country",
+        order_by="ORDER BY count DESC",
+        limit="LIMIT 15"
+    ), params)
     by_country = [{"country": row[0], "count": row[1]} for row in cursor.fetchall()]
     
     # By Year and Type
-    cursor.execute('''
-        SELECT year, type, COUNT(*) as count 
-        FROM disasters 
-        GROUP BY year, type 
-        ORDER BY year ASC
-    ''')
+    cursor.execute(build_query(
+        base_select="SELECT year, type, COUNT(*) as count FROM disasters",
+        group_by="GROUP BY year, type",
+        order_by="ORDER BY year ASC"
+    ), params)
     
     year_map = {}
     for row in cursor.fetchall():
@@ -170,17 +202,36 @@ def get_analytics():
     by_year = list(year_map.values())
     
     # By Type
-    cursor.execute('''
-        SELECT type, COUNT(*) as count 
-        FROM disasters 
-        GROUP BY type
-    ''')
+    cursor.execute(build_query(
+        base_select="SELECT type, COUNT(*) as count FROM disasters",
+        group_by="GROUP BY type"
+    ), params)
     by_type = [{"name": row[0], "value": row[1]} for row in cursor.fetchall()]
+
+    # By Fatalities (Top 10 deadliest)
+    cursor.execute(build_query(
+        base_select="SELECT title, year, fatalities, type FROM disasters",
+        base_where="fatalities IS NOT NULL AND fatalities > 0",
+        order_by="ORDER BY fatalities DESC",
+        limit="LIMIT 10"
+    ), params)
+    by_fatalities = [{"title": row[0], "year": row[1], "fatalities": row[2], "type": row[3]} for row in cursor.fetchall()]
+
+    # By Damage (Top 10 costliest)
+    cursor.execute(build_query(
+        base_select="SELECT title, year, economic_loss, type FROM disasters",
+        base_where="economic_loss IS NOT NULL AND economic_loss > 0",
+        order_by="ORDER BY economic_loss DESC",
+        limit="LIMIT 10"
+    ), params)
+    by_damage = [{"title": row[0], "year": row[1], "damage_millions": row[2], "type": row[3]} for row in cursor.fetchall()]
     
     conn.close()
     
     return {
         "by_country": by_country,
         "by_year": by_year,
-        "by_type": by_type
+        "by_type": by_type,
+        "by_fatalities": by_fatalities,
+        "by_damage": by_damage
     }
