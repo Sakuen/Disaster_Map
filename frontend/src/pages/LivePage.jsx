@@ -20,6 +20,18 @@ export default function LivePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [hoverInfo, setHoverInfo] = useState(null);
+
+  const formatTimeAgo = (timestamp) => {
+    if (!timestamp) return 'Unknown time';
+    const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+    if (seconds < 60) return `${seconds} seconds ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} minutes ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hours ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} days ago`;
+  };
   
   const fetchLiveEvents = () => {
     fetch(LIVE_API_URL)
@@ -124,11 +136,9 @@ export default function LivePage() {
                   <span style={{fontSize: '11px', color: '#8892b0'}}>{ev.source}</span>
                 </div>
                 <h4 style={{margin: '0 0 5px 0', color: '#fff', fontSize: '14px', lineHeight: '1.4'}}>{ev.title}</h4>
-                {ev.time && (
-                  <div style={{display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--accent-color)', marginBottom: '10px'}}>
-                    <Clock size={12} /> {new Date(ev.time).toLocaleString()}
-                  </div>
-                )}
+                <div style={{display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'var(--accent-color)', marginBottom: '10px'}}>
+                  <Clock size={12} /> Occurred: {formatTimeAgo(ev.time)} ({new Date(ev.time).toLocaleDateString()})
+                </div>
                 <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#c5c6c7'}}>
                   <span style={{textTransform: 'capitalize'}}>{ev.type}</span>
                   <span>Mag: {ev.magnitude.toFixed(1)}</span>

@@ -4,19 +4,23 @@ A dynamic, interactive web application that visualizes historical natural hazard
 
 When, where, and why did disaster strike? What can we learn about it? What was the media coverage? The Global Disaster Map aims to answer these questions by providing an immersive 3D globe visualization alongside deep analytical insights and integrated historical media context.
 
-## 🌟 Key Features
+## 🌟 Application Features
 
-### 🗺️ Interactive Map View
-- **3D Globe Visualization**: Powered by DeckGL and MapLibre, offering smooth navigation and a beautiful dark-mode aesthetic.
-- **Timeline Animation**: Watch historical disasters unfold over time (1900 - Present) using the interactive playback timeline.
-- **Advanced Filtering**: A sleek, glassmorphism sidebar to filter hazards by type, magnitude, and depth in real-time.
-- **Contextual Insights**: Click on any disaster data point to fetch rich, contextual media coverage and historical records directly from the Wikipedia API.
+### 🚨 Live Early Warning Center
+A real-time "Mission Control" interface that monitors active global disaster threats. It aggregates live JSON feeds from GDACS and the USGS, offering color-coded Threat Level badges and exact timestamps.
+![Live Warnings](docs/live_warnings.png)
 
-### 📊 Analytics Dashboard
-- **Data Visualizations**: Deep analytical insights powered by Recharts.
-- **Top Affected Regions**: Horizontal bar charts highlighting the countries most frequently impacted by disasters.
-- **Historical Trends**: Multi-line charts tracking the frequency of different disaster types across the last century.
-- **Distribution Analysis**: Pie charts breaking down the global distribution of hazard types.
+### 🎯 Seismic Predictions Engine
+An algorithm-driven forecast dashboard that identifies the world's most "overdue" regions. Using 125 years of historical data, it calculates the average gap between Magnitude 6.5+ earthquakes for each region and highlights the highest "Risk Ratio" hotspots on a WebGL map based on the Seismic Gap Theory.
+![Predictions](docs/predictions.png)
+
+### 🗺️ Historical 3D Map
+A dynamic 3D globe visualization of over 15,000 historical natural hazards. Features a playback timeline animation, deep Wikipedia integration for contextual insights, and a sleek glassmorphism sidebar to filter by magnitude and type.
+![Historical Map](docs/historical_map.png)
+
+### 📊 Analytics Insights
+A deeply interactive, cross-filtering dashboard powered by Recharts. Clicking on any country or disaster type dynamically filters all other visualizations, allowing you to instantly drill down into 125 years of global casualty and economic impact data.
+![Analytics](docs/analytics.png)
 
 ## 🛠️ Technology Stack
 
